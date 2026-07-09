@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartStager AI - 沉浸式智能家具體驗</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        
+        model-viewer::part(default-progress-bar) { display: none; }
+        
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            --poster-color: transparent;
+        }
+
+        #room-3d-container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            border-radius: 1rem;
+            position: relative;
+        }
+        #room-3d-container canvas {
+            display: block;
+            outline: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .toast-enter { animation: slideUp 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-100 py-4 px-6 md:px-12 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <div class="text-2xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
+            <span class="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-lg font-black">S</span>
+            <span>SmartStager AI<span class="text-blue-600">  AR</span></span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                AI尚未執行
+            </span>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
+                <span class="w-1.5 h-1.5 mr-1.5 bg-green-500 rounded-full"></span>
+                系統就緒
+            </span>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-7xl">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div class="lg:col-span-5 flex flex-col space-y-6">
+                <div class="bg-white p-1.5 rounded-xl border border-slate-100 shadow-sm flex space-x-1">
+                    <button id="tab-catalog" class="flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg> 單品瀏覽
+                    </button>
+                    <button id="tab-ai-planner" class="flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> AI 自動佈置
+                    </button>
+                    <button id="tab-manual-planner" class="flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg> 3D 手動佈置
+                    </button>
+                </div>
+
+                <div id="panel-catalog" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 mb-1">客廳家具展廳</h2>
+                        <p class="text-xs text-slate-500">點擊下方實體家具，即可即時切換 3D 模型並進行 AR 擺設</p>
+                    </div>
+                    <div id="catalog-list-container" class="space-y-3 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                        </div>
+                </div>
+
+                <div id="panel-ai-planner" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 mb-1">AI 空間規劃師(開發中)</h2>
+                        <p class="text-xs text-slate-500">輸入客廳格局與風格，由 AI 智能計算生成黃金家具擺設比例</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5">客廳寬度 (cm)</label>
+                            <input id="room-width" type="number" value="500" min="300" max="800" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5">客廳深度 (cm)</label>
+                            <input id="room-depth" type="number" value="400" min="300" max="800" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5">設計風格主題</label>
+                        <select id="layout-style" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="cozy">溫馨影音家庭（電視與主沙發相對，長几居中）</option>
+                            <option value="minimalist">北歐極簡生活（家具貼牆放置，保留寬敞動線）</option>
+                            <option value="lounge">悠閒下午茶（沙發與休閒椅呈斜角對談）</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5">選擇要佈置的家具 (至少一項)</label>
+                        <div id="ai-furniture-selector" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto custom-scrollbar p-1">
+                            </div>
+                    </div>
+
+                    <button id="btn-run-ai" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                        <span>開始 AI 空間規劃</span>
+                    </button>
+
+                    <div id="blueprint-container" class="relative hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> 2D 設計藍圖 (可微調)
+                            </span>
+                        </div>
+                        <div class="relative bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex justify-center p-4">
+                            <canvas id="blueprint-canvas" width="360" height="260" class="bg-slate-950 rounded-lg shadow-inner"></canvas>
+                        </div>
+                        
+                        <button id="btn-render-3d" class="mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white border border-slate-700 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+                            </svg>
+                            <span>生成 3D 全景空間</span>
+                        </button>
+
+                        <div class="mt-3 bg-slate-50 border-l-4 border-blue-500 p-3.5 rounded-r-lg">
+                            <h5 class="text-xs font-bold text-slate-700 mb-1 flex items-center">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg> AI 設計理念評估：
+                            </h5>
+                            <p id="ai-concept-text" class="text-xs text-slate-500 leading-relaxed italic">
+                                點擊上方按鈕開始規劃...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-manual-planner" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100/60">
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center mb-1">
+                            <svg class="w-4 h-4 text-amber-500 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> 3D 自由沙盒模式
+                        </h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">點擊下方按鈕可任意添加家具。置入空間後，您能**在右側 3D 畫面中直接點擊並拖曳家具**來自由佈置排版！</p>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">添加家具至場景</h3>
+                        <div id="manual-list-container" class="space-y-3 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg> 3D/AR 實景操作手勢指南
+                    </h4>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="p-2 bg-slate-50 rounded-xl">
+                            <div class="mb-1">
+                                <svg class="w-6 h-6 mx-auto text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+                            </div>
+                            <div class="text-xs font-bold text-slate-700">單指拖曳</div>
+                            <div class="text-[10px] text-slate-400 mt-1">旋轉視角 / 手動拖移</div>
+                        </div>
+                        <div class="p-2 bg-blue-50 rounded-xl border border-blue-100">
+                            <div class="mb-1">
+                                <svg class="w-6 h-6 mx-auto text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                            </div>
+                            <div class="text-xs font-bold text-blue-700">雙指滑動</div>
+                            <div class="text-[10px] text-blue-500 mt-1">平移空間</div>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded-xl">
+                            <div class="mb-1">
+                                <svg class="w-6 h-6 mx-auto text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                            </div>
+                            <div class="text-xs font-bold text-slate-700">捏合/滾輪</div>
+                            <div class="text-[10px] text-slate-400 mt-1">放大縮小</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 flex flex-col space-y-6">
+                <div id="display-card" class="bg-white rounded-3xl shadow-md overflow-hidden border border-slate-100 flex flex-col md:flex-row h-full">
+                    
+                    <div id="viewer-area" class="w-full md:w-1/2 p-4 bg-slate-50 flex flex-col justify-between relative min-h-[350px] md:min-h-[500px]">
+                        <div class="absolute top-4 left-4 z-10 flex space-x-2">
+                            <span id="product-badge" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
+                                載入中...
+                            </span>
+                            <button id="btn-back-single" class="hidden bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center space-x-1 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                                <span>返回單品 AR</span>
+                            </button>
+                        </div>
+
+                        <div id="single-item-view" class="relative w-full flex-grow flex items-center justify-center h-full min-h-[300px]">
+                            <model-viewer 
+                                id="model-viewer"
+                                src="" ar ar-modes="webxr scene-viewer quick-look" 
+                                ar-scale="auto" ar-placement="floor" camera-controls auto-rotate 
+                                shadow-intensity="1.5" shadow-softness="1" environment-image="neutral" exposure="1.0">
+                            </model-viewer>
+                        </div>
+
+                        <div id="room-3d-view" class="hidden relative w-full h-full flex items-center justify-center">
+                            <div id="room-3d-container">
+                                </div>
+                            <div id="room-loading" class="absolute inset-0 flex items-center justify-center bg-slate-900/80 rounded-xl z-20 backdrop-blur-sm hidden">
+                                <div class="text-blue-400 font-medium flex flex-col items-center">
+                                    <svg class="animate-spin h-10 w-10 mb-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>正在渲染 3D 空間場景...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="info-area" class="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between">
+                        <div>
+                            <div id="product-category" class="uppercase tracking-wider text-xs text-blue-600 font-black mb-1">
+                                資料讀取中...
+                            </div>
+                            <h1 id="product-title" class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-3">
+                                正在連線家具庫
+                            </h1>
+                            <p id="product-description" class="text-slate-500 text-sm mb-6 leading-relaxed">
+                                請稍候，系統正在嘗試載入家具資料。
+                            </p>
+                            
+                            <div id="price-section" class="flex items-center space-x-3 mb-6">
+                                <span id="product-price" class="text-3xl font-black text-slate-900">$-</span>
+                                <span id="product-original-price" class="text-sm text-slate-400 line-through">$-</span>
+                            </div>
+
+                            <div id="color-section" class="mb-6">
+                                <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">可選材質配色</h3>
+                                <div id="product-colors" class="flex space-x-2"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <button id="main-action-btn" class="w-full bg-slate-900 hover:bg-slate-950 text-white font-bold py-3 px-6 rounded-xl shadow-md transition duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+                                立即預訂此設計
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-2xl text-sm font-medium hidden">
+        訊息提示
+    </div>
+
+    <script>
+        const apiKey = ""; 
+        let furnitureData = []; 
+        let activeId = null;
+        let is3DMode = false;
+        let isManualMode = false; 
+        let currentLayout = []; 
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let selected3DModel = null;
+        const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); 
+        const planeIntersection = new THREE.Vector3();
+
+        const dom = {
+            modelViewer: document.getElementById('model-viewer'),
+            productTitle: document.getElementById('product-title'),
+            productDescription: document.getElementById('product-description'),
+            productBadge: document.getElementById('product-badge'),
+            productCategory: document.getElementById('product-category'),
+            listContainer: document.getElementById('catalog-list-container'),
+            manualListContainer: document.getElementById('manual-list-container'),
+            priceSection: document.getElementById('price-section'),
+            colorSection: document.getElementById('color-section'),
+            mainActionBtn: document.getElementById('main-action-btn'),
+            
+            tabCatalog: document.getElementById('tab-catalog'),
+            tabAiPlanner: document.getElementById('tab-ai-planner'),
+            tabManualPlanner: document.getElementById('tab-manual-planner'),
+            panelCatalog: document.getElementById('panel-catalog'),
+            panelAiPlanner: document.getElementById('panel-ai-planner'),
+            panelManualPlanner: document.getElementById('panel-manual-planner'),
+            
+            btnRunAi: document.getElementById('btn-run-ai'),
+            blueprintContainer: document.getElementById('blueprint-container'),
+            canvas: document.getElementById('blueprint-canvas'),
+            ctx: document.getElementById('blueprint-canvas') ? document.getElementById('blueprint-canvas').getContext('2d') : null,
+            aiConceptText: document.getElementById('ai-concept-text'),
+            
+            singleItemView: document.getElementById('single-item-view'),
+            room3dView: document.getElementById('room-3d-view'),
+            room3dContainer: document.getElementById('room-3d-container'),
+            btnRender3d: document.getElementById('btn-render-3d'),
+            btnBackToSingle: document.getElementById('btn-back-single'),
+            roomLoading: document.getElementById('room-loading'),
+			
+			displayCard: document.getElementById('display-card'),
+			viewerArea: document.getElementById('viewer-area'),
+			infoArea: document.getElementById('info-area')
+        };
+
+        function resizeCanvas() {
+            if (!dom.canvas) return;
+            const rect = dom.canvas.parentElement.getBoundingClientRect();
+            dom.canvas.width = rect.width;
+            dom.canvas.height = rect.height;
+            if (currentLayout.length > 0) drawBlueprint();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 100);
+
+        function showToast(message, isSuccess = false) {
+            const toast = document.getElementById('toast');
+            if(!toast) return;
+            
+            const successIcon = '<svg class="w-5 h-5 inline mr-1 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            const errorIcon = '<svg class="w-5 h-5 inline mr-1 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+            
+            toast.innerHTML = (isSuccess ? successIcon : errorIcon) + '<span class="align-middle">' + message + '</span>';
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-enter');
+            
+            if(window.toastTimer) clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        const defaultFurnitureIcon = '<svg class="w-full h-full text-slate-500 p-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>';
+
+        const defaultFurnitureData = [
+            {
+                id: "sheen-chair",
+                name: "北歐奢華絲絨休閒單人椅",
+                category: "客廳單椅系列",
+                price: "NT$ 5,800",
+                originalPrice: "NT$ 7,500",
+                badge: "熱銷單品",
+                description: "融合奢華絲絨質感與極簡金屬框架，精準符合人體工學的曲面設計，為客廳角落注入優雅氛圍。",
+                glbUrl: "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/SheenChair/glTF-Binary/SheenChair.glb",
+                colors: ["#A37A5C", "#4A6B5D", "#2E3A4E"],
+                icon: defaultFurnitureIcon, 
+                realWidth: 85,
+                realDepth: 80,
+                scaleAdjustment: 1
+            },      
+            {
+                id: "sectional-sofa-xmh9ay",
+                name: "當代模 L 型組合沙發",
+                category: "客廳沙發系列",
+                price: "NT$ 45,800",
+                originalPrice: "NT$ 59,000",
+                badge: "極致舒適",
+                description: "Contemporary modular sectional sofa in light beige textured fabric, featuring soft, pillow-like cushioning and rounded edges for a relaxed modern aesthetic.",
+                glbUrl: "A_modern_modular_sectional_sofa.glb", 
+                colors: ["#E2E8F0", "#64748B", "#1E293B"],
+                icon: defaultFurnitureIcon,
+                realWidth: 260,        
+                realDepth: 164,        
+                scaleAdjustment: 2.6,
+                rotationOffset: 180 
+            },
+			{
+				id: "sectional-light-xmh9ay",
+				name: "有機木製三腳架落地燈",
+				category: "燈系列",
+				price: "NT$ 8,200",        // 調整為符合落地燈市場的行情價
+				originalPrice: "NT$ 12,800",
+				badge: "氛圍營造首選",      // 修改為更具情境感的標籤
+				description: "現代有機風格設計，以雕塑感的白色燈罩搭配天然木質三腳架底座。光線透過燈罩漫射出溫潤柔和的氣息，為您的居家空間注入當代藝術的雅緻氛圍。",
+				glbUrl: "A_floor_lamp_with_a_wooden_tripod_base.glb", // 建議修正為不含空格的檔案名稱
+				colors: ["#F5F5F4", "#A8A29E", "#78716C"],
+				icon: defaultFurnitureIcon, 
+				realWidth: 98,       
+				realDepth: 100,       
+				scaleAdjustment: 1.3
+			},
+			{
+                id: "sectional-caffe-table-xmh9ay",
+                name: "洞石雕塑茶几",
+                category: "桌系列",
+                price: "NT$ 28,800",
+                originalPrice: "NT$ 39,500",
+				badge: "設計師精選",        // 調整為更符合雕塑感家具的標籤
+				description: "以天然洞石雕琢而成，展現極簡且厚實的建築美學。獨特的U型底座結合圓潤橢圓桌面，賦予空間現代雕塑藝術的氣質，自然質地能與各類居家風格完美融合。",
+                glbUrl: "An_oval_coffee_table_crafted_from.glb", 
+                colors: ["#D6CFC7", "#B9B2AA", "#A59E96"],
+                icon: defaultFurnitureIcon,
+                realWidth: 260,        
+                realDepth: 156,        
+                scaleAdjustment: 2.0
+            },
+			{
+				id: "sectional-media_console-xmh9ay",
+				name: "胡桃木極簡懸浮電視櫃",
+				category: "電視櫃系列",
+				price: "NT$ 49,990",
+				originalPrice: "NT$ 65,000",
+				badge: "居家美學首選", // 修改為更符合家居風格的標籤
+				description: "採用溫潤胡桃木紋理，以現代極簡主義打造。懸浮式結構結合流線型圓角工藝與隱藏式無把手設計，完美體現當代居家的精緻品味與收納美學。",
+				glbUrl: "A_sleek_modern_floating_media _console.glb", // 建議修正此路徑，移除空格與特殊符號
+				colors: ["#5D4037", "#4E342E", "#3E2723"], // 調整為更貼近胡桃木色的色碼
+				icon: defaultFurnitureIcon, // 使用更具象的符號
+				realWidth: 260,       
+				realDepth: 50,       
+				scaleAdjustment: 2.6
+			}
+        ];
+
+        async function loadFurnitureData() {
+            try {
+                furnitureData = defaultFurnitureData;
+                if (furnitureData.length > 0) {
+                    activeId = furnitureData[0].id;
+                    renderCatalog();
+                    renderManualCatalog(); 
+                    renderAiFurnitureSelector(); 
+                    switchFurniture(activeId); 
+                    showToast("家具庫載入成功！", true);
+                } else {
+                    throw new Error('資料庫為空陣列');
+                }
+            } catch (error) {
+                console.error("載入家具庫失敗:", error);
+                showToast("載入家具庫失敗，請確認資料來源。");
+            }
+        }
+
+        function renderAiFurnitureSelector() {
+            const selector = document.getElementById('ai-furniture-selector');
+            if (!selector || !furnitureData) return;
+            selector.innerHTML = '';
+            
+            furnitureData.forEach(item => {
+                const label = document.createElement('label');
+                label.className = "flex items-center space-x-3 bg-white border border-slate-200 rounded-lg p-2.5 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition shadow-sm";
+                label.innerHTML = `
+                    <input type="checkbox" value="${item.id}" checked class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer accent-blue-600">
+                    <span class="flex items-center text-sm font-medium text-slate-700 truncate" title="${item.name}">
+                        <div class="w-6 h-6 mr-1">${item.icon}</div> ${item.name}
+                    </span>
+                `;
+                selector.appendChild(label);
+            });
+        }
+
+        let scene, camera, renderer, controls;
+        let loadedModels = [];
+
+        function createWoodFloorTexture(rWidthM, rDepthM) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f0d3b1'; ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = '#d4b38a'; ctx.lineWidth = 1.5;
+            
+            const plankHeight = 32;
+            for (let y = 0; y < 512; y += plankHeight) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+                const offset = (y / plankHeight) % 3;
+                for (let x = offset * 40; x < 512; x += 120) {
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + plankHeight); ctx.stroke();
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(rWidthM * 1.5, rDepthM * 1.5);
+            return texture;
+        }
+
+        function initThreeJS() {
+            if (scene) return; 
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a); 
+            scene.fog = new THREE.Fog(0x0f172a, 4, 12);
+
+            camera = new THREE.PerspectiveCamera(50, dom.room3dContainer.clientWidth / dom.room3dContainer.clientHeight, 0.1, 100);
+            camera.position.set(0, 3, 5); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(dom.room3dContainer.clientWidth, dom.room3dContainer.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+
+            dom.room3dContainer.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+            controls.minDistance = 2; controls.maxDistance = 8;
+            controls.target.set(0, 0.5, 0);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffedd5, 2.5); 
+            dirLight.position.set(5, 8, 3);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.bias = -0.001;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0xbae6fd, 1.2); 
+            fillLight.position.set(-5, 3, -5);
+            scene.add(fillLight);
+
+            setup3DDragInteraction();
+
+            window.addEventListener('resize', () => {
+                if (!is3DMode) return;
+                camera.aspect = dom.room3dContainer.clientWidth / dom.room3dContainer.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(dom.room3dContainer.clientWidth, dom.room3dContainer.clientHeight);
+            });
+
+            renderer.setAnimationLoop(() => {
+                controls.update();
+                renderer.render(scene, camera);
+            });
+        }
+
+		function setup3DDragInteraction() {
+			const canvasElement = renderer.domElement;
+
+			canvasElement.addEventListener('pointerdown', (e) => {
+				if (!isManualMode) return; 
+
+				const rect = renderer.domElement.getBoundingClientRect();
+				mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+				mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+				raycaster.setFromCamera(mouse, camera);
+				const intersects = raycaster.intersectObjects(loadedModels, true);
+
+				if (intersects.length > 0) {
+					let obj = intersects[0].object;
+					
+					while (obj.parent && (!obj.name || !obj.name.startsWith('3d_item_'))) {
+						obj = obj.parent;
+					}
+
+					if (obj && obj.name && obj.name.startsWith('3d_item_')) {
+						selected3DModel = obj;
+						
+						controls.enabled = false; 
+						controls.update(); 
+						
+						const layoutIdx = parseInt(selected3DModel.name.split('_').pop());
+						const itemData = furnitureData.find(f => f.id === currentLayout[layoutIdx]?.id);
+						if(itemData) showToast(`已選定家具: ${itemData.name}，請拖曳移動`, true);
+					}
+				}
+			});
+
+			canvasElement.addEventListener('pointermove', (e) => {
+				if (!isManualMode || !selected3DModel) return;
+
+				const rect = renderer.domElement.getBoundingClientRect();
+				mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+				mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+				raycaster.setFromCamera(mouse, camera);
+
+				if (raycaster.ray.intersectPlane(dragPlane, planeIntersection)) {
+					const rWidthM = (parseInt(document.getElementById('room-width').value) || 500) / 100;
+					const rDepthM = (parseInt(document.getElementById('room-depth').value) || 400) / 100;
+
+					const boundX = (rWidthM / 2) * 0.95;
+					const boundZ = (rDepthM / 2) * 0.95;
+
+					const balconyDepth = 2.2;                
+					const winWidthM = rDepthM * 0.55;        
+					const winBoundZ = (winWidthM / 2) * 0.9; 
+
+					let targetX = planeIntersection.x;
+					let targetZ = planeIntersection.z;
+
+					targetZ = Math.max(-boundZ, Math.min(boundZ, targetZ));
+
+					if (targetZ >= -winBoundZ && targetZ <= winBoundZ) {
+						targetX = Math.max(-boundX, Math.min(boundX + balconyDepth * 0.85, targetX));
+					} else {
+						targetX = Math.max(-boundX, Math.min(boundX, targetX));
+					}
+
+					selected3DModel.position.x = targetX;
+					selected3DModel.position.z = targetZ;
+
+					const layoutIdx = parseInt(selected3DModel.name.split('_').pop());
+					if (!isNaN(layoutIdx) && currentLayout[layoutIdx]) {
+						currentLayout[layoutIdx].x_pct = Math.round(((selected3DModel.position.x / rWidthM) + 0.5) * 100);
+						currentLayout[layoutIdx].y_pct = Math.round(((selected3DModel.position.z / rDepthM) + 0.5) * 100);
+					}
+				}
+			});
+
+			window.addEventListener('pointerup', () => {
+				if (selected3DModel) {
+					selected3DModel = null;
+					controls.enabled = true; 
+					showToast("家具位置已固定", true);
+					renderManualCatalog(); 
+				}
+			});
+			
+			const saveRotationData = (obj) => {
+				const layoutIdx = parseInt(obj.name.split('_').pop());
+				if (!isNaN(layoutIdx) && currentLayout[layoutIdx]) {
+					let deg = Math.round(THREE.MathUtils.radToDeg(obj.rotation.y)) % 360;
+					if (deg < 0) deg += 360;
+					currentLayout[layoutIdx].rotation = deg; 
+				}
+			};
+
+			canvasElement.addEventListener('dblclick', (e) => {
+				if (!isManualMode) return;
+
+				const rect = renderer.domElement.getBoundingClientRect();
+				mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+				mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+				raycaster.setFromCamera(mouse, camera);
+				const intersects = raycaster.intersectObjects(loadedModels, true);
+
+				if (intersects.length > 0) {
+					let obj = intersects[0].object;
+					while (obj.parent && (!obj.name || !obj.name.startsWith('3d_item_'))) {
+						obj = obj.parent;
+					}
+					if (obj && obj.name && obj.name.startsWith('3d_item_')) {
+						obj.rotation.y += Math.PI / 2;
+						saveRotationData(obj);
+						showToast("家具已旋轉 90 度", true);
+					}
+				}
+			});
+
+			window.addEventListener('wheel', (e) => {
+				if (!isManualMode || !selected3DModel) return;
+				
+				e.preventDefault(); 
+				
+				const rotationStep = Math.PI / 12; 
+				selected3DModel.rotation.y += e.deltaY > 0 ? rotationStep : -rotationStep;
+
+				saveRotationData(selected3DModel);
+			}, { passive: false });
+			
+		}
+
+        async function build3DRoomScene() {
+            dom.roomLoading.classList.remove('hidden');
+            initThreeJS();
+
+            loadedModels.forEach(model => {
+                scene.remove(model);
+                model.traverse(child => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        if(child.material.dispose) child.material.dispose();
+                    }
+                });
+            });
+            loadedModels = [];
+
+            const rWidthCm = parseInt(document.getElementById('room-width').value) || 500;
+            const rDepthCm = parseInt(document.getElementById('room-depth').value) || 400;
+            const rWidthM = rWidthCm / 100;
+            const rDepthM = rDepthCm / 100;
+            const rHeightM = 2.4; 
+
+            dragPlane.constant = 0; 
+
+            const floorGeo = new THREE.PlaneGeometry(rWidthM, rDepthM);
+            const floorTex = createWoodFloorTexture(rWidthM, rDepthM);
+            const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.35, metalness: 0.1 });
+            const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.9, metalness: 0.0 });
+            const backWall = new THREE.Mesh(new THREE.PlaneGeometry(rWidthM, rHeightM), wallMat);
+            backWall.position.set(0, rHeightM / 2, -rDepthM / 2); backWall.receiveShadow = true; scene.add(backWall);
+
+            const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(rDepthM, rHeightM), wallMat);
+            leftWall.position.set(-rWidthM / 2, rHeightM / 2, 0); leftWall.rotation.y = Math.PI / 2; leftWall.receiveShadow = true; scene.add(leftWall);
+
+            const winWidthM = rDepthM * 0.55;                
+            const sideWallWidthM = (rDepthM - winWidthM) / 2; 
+            const balconyDepth = 2.2;                        
+
+            const rightWallFront = new THREE.Mesh(new THREE.PlaneGeometry(sideWallWidthM, rHeightM), wallMat);
+            rightWallFront.position.set(rWidthM / 2, rHeightM / 2, rDepthM / 2 - sideWallWidthM / 2);
+            rightWallFront.rotation.y = -Math.PI / 2; 
+            rightWallFront.receiveShadow = true;
+            scene.add(rightWallFront);
+
+            const rightWallBack = new THREE.Mesh(new THREE.PlaneGeometry(sideWallWidthM, rHeightM), wallMat);
+            rightWallBack.position.set(rWidthM / 2, rHeightM / 2, -rDepthM / 2 + sideWallWidthM / 2);
+            rightWallBack.rotation.y = -Math.PI / 2;
+            rightWallBack.receiveShadow = true;
+            scene.add(rightWallBack);
+
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff,
+                transmission: 0.85, 
+                opacity: 1,
+                transparent: true,
+                roughness: 0.05,
+                ior: 1.5,           
+                side: THREE.DoubleSide
+            });
+            const slidingWindow = new THREE.Mesh(new THREE.PlaneGeometry(winWidthM, rHeightM), glassMat);
+            slidingWindow.position.set(rWidthM / 2, rHeightM / 2, 0);
+            slidingWindow.rotation.y = -Math.PI / 2;
+            scene.add(slidingWindow);
+
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.8 });
+            
+            const topFrame = new THREE.Mesh(new THREE.BoxGeometry(winWidthM, 0.1, 0.15), frameMat);
+            topFrame.position.set(rWidthM / 2, rHeightM, 0);
+            topFrame.rotation.y = -Math.PI / 2;
+            scene.add(topFrame);
+            
+            const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(winWidthM, 0.05, 0.15), frameMat);
+            bottomFrame.position.set(rWidthM / 2, 0.025, 0);
+            bottomFrame.rotation.y = -Math.PI / 2;
+            scene.add(bottomFrame);
+            
+            const frontFrame = new THREE.Mesh(new THREE.BoxGeometry(0.1, rHeightM, 0.15), frameMat);
+            frontFrame.position.set(rWidthM / 2, rHeightM / 2, winWidthM / 2);
+            frontFrame.rotation.y = -Math.PI / 2;
+            scene.add(frontFrame);
+            
+            const backFrame = new THREE.Mesh(new THREE.BoxGeometry(0.1, rHeightM, 0.15), frameMat);
+            backFrame.position.set(rWidthM / 2, rHeightM / 2, -winWidthM / 2);
+            backFrame.rotation.y = -Math.PI / 2;
+            scene.add(backFrame);
+            
+            const centerFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, rHeightM, 0.18), frameMat);
+            centerFrame.position.set(rWidthM / 2, rHeightM / 2, 0);
+            centerFrame.rotation.y = -Math.PI / 2;
+            scene.add(centerFrame);
+
+            const balconyFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(balconyDepth, winWidthM), 
+                new THREE.MeshStandardMaterial({ color: 0x8ea3b8, roughness: 0.85 }) 
+            );
+            balconyFloor.rotation.x = -Math.PI / 2;
+            balconyFloor.position.set(rWidthM / 2 + balconyDepth / 2, -0.01, 0);
+            balconyFloor.receiveShadow = true;
+            scene.add(balconyFloor);
+
+            const railingHeight = 1.1;
+            const handrailMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.6 });
+
+            const frontRailing = new THREE.Mesh(new THREE.BoxGeometry(0.05, railingHeight, winWidthM), glassMat);
+            frontRailing.position.set(rWidthM / 2 + balconyDepth, railingHeight / 2, 0);
+            scene.add(frontRailing);
+
+            const frontHandrail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, winWidthM), handrailMat);
+            frontHandrail.position.set(rWidthM / 2 + balconyDepth, railingHeight, 0);
+            scene.add(frontHandrail);
+
+            const sideRailingBack = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, railingHeight, 0.05), glassMat);
+            sideRailingBack.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight / 2, -winWidthM / 2);
+            scene.add(sideRailingBack);
+
+            const sideHandrailBack = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, 0.05, 0.12), handrailMat);
+            sideHandrailBack.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight, -winWidthM / 2);
+            scene.add(sideHandrailBack);
+
+            const sideRailingFront = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, railingHeight, 0.05), glassMat);
+            sideRailingFront.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight / 2, winWidthM / 2);
+            scene.add(sideRailingFront);
+
+            const sideHandrailFront = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, 0.05, 0.12), handrailMat);
+            sideHandrailFront.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight, winWidthM / 2);
+            scene.add(sideHandrailFront);
+
+            const loader = new THREE.GLTFLoader();
+            const loadPromises = currentLayout.map((layoutItem, index) => {
+                return new Promise((resolve) => {
+                    const itemData = furnitureData.find(f => f.id === layoutItem.id);
+                    if (!itemData) return resolve();
+
+                    loader.load(itemData.glbUrl, (gltf) => {
+                        const model = gltf.scene;
+                        
+                        model.name = `3d_item_${layoutItem.id}_${index}`;
+
+                        const xPos = ((layoutItem.x_pct / 100) - 0.5) * rWidthM;
+                        const zPos = ((layoutItem.y_pct / 100) - 0.5) * rDepthM;
+                        model.position.set(xPos, 0, zPos);
+
+                        const finalRotationDegrees = layoutItem.rotation + (itemData.rotationOffset || 0);
+                        model.rotation.y = - (finalRotationDegrees * Math.PI) / 180; 
+
+                        const scale = itemData.scaleAdjustment || 1;
+                        model.scale.set(scale, scale, scale);
+
+                        const box = new THREE.Box3().setFromObject(model);
+                        const lowestY = box.min.y;
+                        model.position.y = model.position.y - lowestY;
+
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+
+                        scene.add(model);
+                        loadedModels.push(model); 
+                        resolve();
+                    }, undefined, (error) => {
+                        console.error(`模型載入失敗: ${itemData.id}`, error);
+                        resolve(); 
+                    });
+                });
+            });
+
+            await Promise.all(loadPromises);
+            dom.roomLoading.classList.add('hidden');
+        }
+
+        function switchTo3DMode(manualRequest = false) {
+            is3DMode = true;
+            isManualMode = manualRequest;
+
+            if(dom.singleItemView) dom.singleItemView.classList.add('hidden');
+            if(dom.room3dView) dom.room3dView.classList.remove('hidden');
+            if(dom.btnBackToSingle) dom.btnBackToSingle.classList.remove('hidden');
+            
+            // 進入 3D 模式時隱藏右下角的 AR 按鈕
+            const arBtn = document.getElementById('custom-ar-btn');
+            if (arBtn) arBtn.classList.add('hidden');
+            
+            if(dom.priceSection) dom.priceSection.classList.add('hidden');
+            if(dom.colorSection) dom.colorSection.classList.add('hidden');
+			
+            // 進入 3D：移除桌機版的左右並排與半寬設定，強制全部上下排+滿寬
+			if(dom.displayCard) {
+				dom.displayCard.classList.remove('md:flex-row');
+			}
+			if(dom.viewerArea) {
+				dom.viewerArea.classList.remove('md:w-1/2');
+				dom.viewerArea.style.minHeight = '600px'; 
+			}
+			if(dom.infoArea) {
+				dom.infoArea.classList.remove('md:w-1/2');
+			}
+			setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+
+            if (isManualMode) {
+                if(dom.productBadge) dom.productBadge.innerText = "3D 自由沙盒模式";
+                if(dom.productCategory) dom.productCategory.innerText = "3D 手動自由佈置";
+                if(dom.productTitle) dom.productTitle.innerText = "自訂夢幻客廳藍圖";
+                if(dom.productDescription) dom.productDescription.innerText = "您已開啟全自由佈置模式！在左側控制台點選家具即可放入，並可以直接用滑鼠在 3D 房間中壓住家具來調整擺放位置，打造最有成就感的專屬客廳排版。";
+                if(dom.mainActionBtn) dom.mainActionBtn.innerText = "儲存此手動設計";
+            } else {
+                if(dom.productBadge) dom.productBadge.innerText = "3D 全景空間";
+                if(dom.productCategory) dom.productCategory.innerText = "AI 智能空間規劃";
+                if(dom.productTitle) dom.productTitle.innerText = "專屬您的全景客廳";
+                if(dom.productDescription) dom.productDescription.innerText = "此場景由 Gemini AI 設計生成。您可以查看、旋轉整座房間。若想自己親手挪動家具，請切換至「3D 手動佈置」頁籤。";
+                if(dom.mainActionBtn) dom.mainActionBtn.innerText = "打包整套設計方案";
+            }
+
+            build3DRoomScene();
+        }
+
+        function switchToSingleMode() {
+            is3DMode = false;
+            isManualMode = false;
+            if(dom.room3dView) dom.room3dView.classList.add('hidden');
+            if(dom.singleItemView) dom.singleItemView.classList.remove('hidden');
+            if(dom.btnBackToSingle) dom.btnBackToSingle.classList.add('hidden');
+            
+            // 返回單品模式時重新顯示 AR 按鈕
+            const arBtn = document.getElementById('custom-ar-btn');
+            if (arBtn) arBtn.classList.remove('hidden');
+            
+            if(dom.priceSection) dom.priceSection.classList.remove('hidden');
+            if(dom.colorSection) dom.colorSection.classList.remove('hidden');
+            if(dom.mainActionBtn) dom.mainActionBtn.innerText = "立即預訂此設計";
+			
+            // 返回單品：加回桌機版的 md:flex-row 與 md:w-1/2 (注意：絕對不要移除 flex-col)
+			if(dom.displayCard) {
+				dom.displayCard.classList.add('md:flex-row');
+                dom.displayCard.classList.add('flex-col'); // 確保手機版上下排存在
+			}
+			if(dom.viewerArea) {
+				dom.viewerArea.classList.add('md:w-1/2');
+                dom.viewerArea.classList.add('w-full');    // 確保手機版寬度 100% 存在
+				dom.viewerArea.style.minHeight = ''; 
+			}
+			if(dom.infoArea) {
+				dom.infoArea.classList.add('md:w-1/2');
+                dom.infoArea.classList.add('w-full');      // 確保手機版寬度 100% 存在
+			}
+			setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+
+            dom.tabCatalog.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm";
+            dom.tabAiPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            dom.tabManualPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            if(dom.panelCatalog) dom.panelCatalog.classList.remove('hidden');
+            if(dom.panelAiPlanner) dom.panelAiPlanner.classList.add('hidden');
+            if(dom.panelManualPlanner) dom.panelManualPlanner.classList.add('hidden');
+
+            if (activeId) switchFurniture(activeId); 
+        }
+
+        if(dom.btnRender3d) dom.btnRender3d.addEventListener('click', () => {
+            if (currentLayout.length === 0) {
+                showToast("請先點擊上方按鈕執行 AI 空間規劃！");
+                return;
+            }
+            switchTo3DMode(false); 
+            showToast("已進入 3D 全景模式，可任意拖曳旋轉視角", true);
+        });
+
+        if(dom.btnBackToSingle) dom.btnBackToSingle.addEventListener('click', () => {
+            switchToSingleMode();
+        });
+
+        if(dom.tabCatalog) dom.tabCatalog.addEventListener('click', () => {
+            dom.tabCatalog.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm";
+            dom.tabAiPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            dom.tabManualPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            if(dom.panelCatalog) dom.panelCatalog.classList.remove('hidden');
+            if(dom.panelAiPlanner) dom.panelAiPlanner.classList.add('hidden');
+            if(dom.panelManualPlanner) dom.panelManualPlanner.classList.add('hidden');
+            if (is3DMode) switchToSingleMode();
+        });
+
+        if(dom.tabAiPlanner) dom.tabAiPlanner.addEventListener('click', () => {
+            dom.tabAiPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm";
+            dom.tabCatalog.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            dom.tabManualPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            if(dom.panelAiPlanner) dom.panelAiPlanner.classList.remove('hidden');
+            if(dom.panelCatalog) dom.panelCatalog.classList.add('hidden');
+            if(dom.panelManualPlanner) dom.panelManualPlanner.classList.add('hidden');
+            
+            if (is3DMode) {
+                switchTo3DMode(false);
+            } else {
+                if (currentLayout.length > 0) drawBlueprint();
+            }
+        });
+
+        if(dom.tabManualPlanner) dom.tabManualPlanner.addEventListener('click', () => {
+            dom.tabManualPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all bg-blue-600 text-white shadow-sm";
+            dom.tabCatalog.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            dom.tabAiPlanner.className = "flex flex-1 items-center justify-center py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-800";
+            
+            if(dom.panelManualPlanner) dom.panelManualPlanner.classList.remove('hidden');
+            if(dom.panelCatalog) dom.panelCatalog.classList.add('hidden');
+            if(dom.panelAiPlanner) dom.panelAiPlanner.classList.add('hidden');
+
+            renderManualCatalog(); 
+            switchTo3DMode(true);  
+            showToast("手動沙盒模式已啟動！點擊左側家具添加，直接拖曳 3D 物件移動。", true);
+        });
+
+        function renderCatalog() {
+            if (!furnitureData || furnitureData.length === 0 || !dom.listContainer) return;
+            dom.listContainer.innerHTML = '';
+            furnitureData.forEach(item => {
+                const isActive = item.id === activeId;
+                const itemButton = document.createElement('button');
+                itemButton.className = `w-full text-left p-3.5 rounded-xl transition duration-200 flex items-center space-x-3 border ${
+                    isActive ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500/20' : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 shadow-sm'
+                }`;
+                
+                itemButton.innerHTML = `
+                    <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-2xl shadow-inner">${item.icon}</div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-400 font-medium">${item.category}</span>
+                            ${isActive ? '<span class="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">展示中</span>' : ''}
+                        </div>
+                        <h3 class="font-bold text-sm text-slate-800 truncate">${item.name}</h3>
+                        <span class="text-xs font-bold text-blue-600">${item.price}</span>
+                    </div>
+                `;
+
+                itemButton.addEventListener('click', () => {
+                    if (is3DMode) switchToSingleMode(); 
+                    if (activeId !== item.id) switchFurniture(item.id);
+                });
+                dom.listContainer.appendChild(itemButton);
+            });
+        }
+
+        function renderManualCatalog() {
+            if (!furnitureData || !dom.manualListContainer) return;
+            dom.manualListContainer.innerHTML = '';
+
+            furnitureData.forEach(item => {
+                const countInRoom = currentLayout.filter(l => l.id === item.id).length;
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "w-full p-3 bg-white border border-slate-100 rounded-xl shadow-sm flex items-center justify-between hover:border-slate-200 transition";
+                itemDiv.innerHTML = `
+					<div class="flex items-center space-x-3 truncate">
+						<div class="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+							<model-viewer 
+								src="${item.glbUrl}" 
+								alt="${item.name}"
+								auto-rotate 
+								camera-controls 
+								disable-zoom
+								shadow-intensity="0"
+								camera-orbit="45deg 55deg 2m">
+							</model-viewer>
+						</div>
+						
+						<div class="truncate">
+							<h4 class="font-bold text-xs text-slate-800 truncate">${item.name}</h4>
+							<p class="text-[10px] text-slate-400">已置入: <span class="font-extrabold text-blue-600">${countInRoom}</span></p>
+						</div>
+					</div>
+					<div class="flex space-x-1 ml-2">
+						<button id="add-m-${item.id}" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+						${countInRoom > 0 ? `<button id="del-m-${item.id}" class="bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-lg transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>` : ''}
+					</div>
+				`;
+
+                dom.manualListContainer.appendChild(itemDiv);
+
+                document.getElementById(`add-m-${item.id}`).addEventListener('click', () => {
+                    currentLayout.push({
+                        id: item.id,
+                        x_pct: 45 + Math.floor(Math.random() * 10), 
+                        y_pct: 45 + Math.floor(Math.random() * 10),
+                        rotation: 0
+                    });
+                    renderManualCatalog();
+                    build3DRoomScene(); 
+                    showToast(`已在客廳中央置入一部 ${item.name}`, true);
+                });
+
+                if (countInRoom > 0) {
+                    document.getElementById(`del-m-${item.id}`).addEventListener('click', () => {
+                        const lastIndex = currentLayout.map(l => l.id).lastIndexOf(item.id);
+                        if (lastIndex !== -1) {
+                            currentLayout.splice(lastIndex, 1);
+                            renderManualCatalog();
+                            build3DRoomScene();
+                            showToast(`已移出一部 ${item.name}`);
+                        }
+                    });
+                }
+            });
+        }
+
+        function switchFurniture(id) {
+            activeId = id;
+            const item = furnitureData.find(f => f.id === id);
+            if (!item) return;
+
+            renderCatalog();
+
+            if(dom.productBadge) dom.productBadge.innerText = item.badge;
+            if(dom.productCategory) dom.productCategory.innerText = item.category;
+            if(dom.productTitle) dom.productTitle.innerText = item.name;
+            if(dom.productDescription) dom.productDescription.innerText = item.description;
+            
+            const pPrice = document.getElementById('product-price');
+            const poPrice = document.getElementById('product-original-price');
+            if(pPrice) pPrice.innerText = item.price;
+            if(poPrice) poPrice.innerText = item.originalPrice;
+
+            const colorContainer = document.getElementById('product-colors');
+            if (colorContainer) {
+                colorContainer.innerHTML = '';
+                if (item.colors) {
+                    item.colors.forEach((color, idx) => {
+                        const btn = document.createElement('button');
+                        btn.className = `w-8 h-8 rounded-full border-2 border-white ring-1 ring-slate-300 hover:scale-110 transition shadow-sm ${idx === 0 ? 'ring-2 ring-blue-500' : ''}`;
+                        btn.style.backgroundColor = color;
+                        btn.addEventListener('click', () => {
+                            Array.from(colorContainer.children).forEach(c => c.classList.remove('ring-2', 'ring-blue-500'));
+                            btn.classList.add('ring-2', 'ring-blue-500');
+                        });
+                        colorContainer.appendChild(btn);
+                    });
+                }
+            }
+            if(dom.modelViewer) dom.modelViewer.src = item.glbUrl;
+        }
+
+        async function callGeminiPlanner(width, depth, style, selectedFurniture) {
+            const styleDescriptions = {
+                cozy: "溫馨影音家庭風格（沙發與核心家具置中，動線溫馨）",
+                minimalist: "北歐極簡生活風格（家具貼邊，留出最大的中央動線）",
+                lounge: "悠閒下午茶風格（家具錯落擺放，營造悠閒氣氛）"
+            };
+
+            const availableFurnitureIds = selectedFurniture.map(f => `'${f.id}'`).join(', ');
+            const furnitureDetails = selectedFurniture.map((f, i) => `${i + 1}. ${f.id}(${f.name})`).join(' ');
+
+            const systemPrompt = `You are an interior designer. Plan a living room using ONLY: ${availableFurnitureIds}. 
+Output MUST be structured JSON. No markdown. Room boundaries: width ${width}cm, depth ${depth}cm. 
+Use percentage coordinates (x_pct, y_pct from 10 to 90). Provide reason in 'roomAnalysis' in Traditional Chinese.`;
+
+            const userQuery = `規劃寬 ${width}cm、深 ${depth}cm 客廳。風格：${styleDescriptions[style]}。
+包含下列家具：${furnitureDetails}
+回傳JSON：{"roomAnalysis": "...", "furnitureLayout": [{"id": "${selectedFurniture[0]?.id || 'item'}", "x_pct": 50, "y_pct": 20, "rotation": 180}, ...]}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { 
+                    responseMimeType: "application/json", 
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            roomAnalysis: { type: "STRING" },
+                            furnitureLayout: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: { id: { type: "STRING" }, x_pct: { type: "INTEGER" }, y_pct: { type: "INTEGER" }, rotation: { type: "INTEGER" } },
+                                    required: ["id", "x_pct", "y_pct", "rotation"]
+                                }
+                            }
+                        },
+                        required: ["roomAnalysis", "furnitureLayout"]
+                    }
+                }
+            };
+
+            const maxRetries = 5; const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i <= maxRetries; i++) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    const data = await response.json();
+                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                } catch (err) {
+                    if (i === maxRetries) throw err; 
+                    await new Promise(resolve => setTimeout(resolve, delays[i])); 
+                }
+            }
+        }
+
+        let selectedLayoutItemIndex = null;
+        let isDragging = false;
+        let dragOffsetX = 0, dragOffsetY = 0;
+
+        function drawBlueprint() {
+            if (!dom.canvas || !dom.ctx) return;
+            dom.ctx.clearRect(0, 0, dom.canvas.width, dom.canvas.height);
+            const rW = parseInt(document.getElementById('room-width').value) || 500;
+            const rD = parseInt(document.getElementById('room-depth').value) || 400;
+            const scale = Math.min((dom.canvas.width - 50) / rW, (dom.canvas.height - 50) / rD);
+            const pxW = rW * scale, pxH = rD * scale;
+            const offsetX = (dom.canvas.width - pxW) / 2, offsetY = (dom.canvas.height - pxH) / 2;
+
+            dom.ctx.strokeStyle = "#e2e8f0"; dom.ctx.lineWidth = 1;
+            for (let x = 0; x < dom.canvas.width; x += 20) { dom.ctx.beginPath(); dom.ctx.moveTo(x, 0); dom.ctx.lineTo(x, dom.canvas.height); dom.ctx.stroke(); }
+            for (let y = 0; y < dom.canvas.height; y += 20) { dom.ctx.beginPath(); dom.ctx.moveTo(0, y); dom.ctx.lineTo(dom.canvas.width, y); dom.ctx.stroke(); }
+
+            dom.ctx.strokeStyle = "#3b82f6"; dom.ctx.lineWidth = 3;
+            dom.ctx.strokeRect(offsetX, offsetY, pxW, pxH);
+            
+            dom.ctx.fillStyle = "#94a3b8"; dom.ctx.font = "10px monospace";
+            dom.ctx.fillText(`${rW} cm`, dom.canvas.width / 2 - 15, offsetY - 10);
+            dom.ctx.save(); dom.ctx.translate(offsetX - 10, dom.canvas.height / 2); dom.ctx.rotate(-Math.PI / 2); dom.ctx.fillText(`${rD} cm`, -15, 0); dom.ctx.restore();
+
+            currentLayout.forEach((layoutItem, index) => {
+                const itemData = furnitureData.find(f => f.id === layoutItem.id);
+                if (!itemData) return;
+                const posX = offsetX + (layoutItem.x_pct / 100) * pxW;
+                const posY = offsetY + (layoutItem.y_pct / 100) * pxH;
+                const iW = (itemData.realWidth || 50) * scale, iH = (itemData.realDepth || 50) * scale;
+
+                dom.ctx.save();
+                dom.ctx.translate(posX, posY);
+                dom.ctx.rotate((layoutItem.rotation * Math.PI) / 180);
+
+                const isSelected = selectedLayoutItemIndex === index;
+                dom.ctx.shadowColor = isSelected ? "#3b82f6" : "transparent"; dom.ctx.shadowBlur = 10;
+                dom.ctx.fillStyle = isSelected ? "rgba(59, 130, 246, 0.25)" : "rgba(255, 255, 255, 0.9)";
+                dom.ctx.strokeStyle = isSelected ? "#3b82f6" : "#64748b"; dom.ctx.lineWidth = isSelected ? 2 : 1.5;
+                
+                dom.ctx.beginPath(); dom.ctx.roundRect(-iW / 2, -iH / 2, iW, iH, 4); dom.ctx.fill(); dom.ctx.stroke();
+                dom.ctx.shadowColor = "transparent";
+                
+                dom.ctx.strokeStyle = isSelected ? "#60a5fa" : "#94a3b8"; dom.ctx.lineWidth = 2.5;
+                dom.ctx.beginPath(); dom.ctx.moveTo(-iW / 3, -iH / 2 + 3); dom.ctx.lineTo(iW / 3, -iH / 2 + 3); dom.ctx.stroke();
+                
+                dom.ctx.fillStyle = "#334155"; dom.ctx.font = "bold 14px sans-serif"; dom.ctx.textAlign = "center"; dom.ctx.textBaseline = "middle";
+                dom.ctx.fillText(itemData.name.charAt(0) || "物", 0, 0);
+                dom.ctx.restore();
+
+                layoutItem._pxX = posX; layoutItem._pxY = posY; layoutItem._pxW = iW; layoutItem._pxH = iH;
+            });
+        }
+
+        function getMousePos(evt) { if(!dom.canvas) return {x:0, y:0}; const rect = dom.canvas.getBoundingClientRect(); return { x: evt.clientX - rect.left, y: evt.clientY - rect.top }; }
+        if(dom.canvas) {
+            dom.canvas.addEventListener('mousedown', (e) => {
+                const pos = getMousePos(e);
+                let clickedIndex = currentLayout.findIndex(item => 
+                    pos.x >= item._pxX - item._pxW/2 - 10 && pos.x <= item._pxX + item._pxW/2 + 10 &&
+                    pos.y >= item._pxY - item._pxH/2 - 10 && pos.y <= item._pxY + item._pxH/2 + 10
+                );
+                
+                if (clickedIndex !== -1) {
+                    selectedLayoutItemIndex = clickedIndex; isDragging = true;
+                    dragOffsetX = pos.x - currentLayout[clickedIndex]._pxX; dragOffsetY = pos.y - currentLayout[clickedIndex]._pxY;
+                    if (!is3DMode) switchFurniture(currentLayout[clickedIndex].id); 
+                } else {
+                    selectedLayoutItemIndex = null;
+                }
+                drawBlueprint();
+            });
+            dom.canvas.addEventListener('mousemove', (e) => {
+                if (!isDragging || selectedLayoutItemIndex === null) return;
+                const rW = parseInt(document.getElementById('room-width').value) || 500, rD = parseInt(document.getElementById('room-depth').value) || 400;
+                const scale = Math.min((dom.canvas.width - 50) / rW, (dom.canvas.height - 50) / rD);
+                const pxW = rW * scale, pxH = rD * scale, offsetX = (dom.canvas.width - pxW) / 2, offsetY = (dom.canvas.height - pxH) / 2;
+                const pos = getMousePos(e), item = currentLayout[selectedLayoutItemIndex];
+                
+                item.x_pct = Math.max(10, Math.min(90, Math.round(((pos.x - dragOffsetX - offsetX) / pxW) * 100)));
+                item.y_pct = Math.max(10, Math.min(90, Math.round(((pos.y - dragOffsetY - offsetY) / pxH) * 100)));
+                drawBlueprint();
+            });
+            dom.canvas.addEventListener('mouseup', () => { 
+                isDragging = false; 
+                if(is3DMode && selectedLayoutItemIndex !== null) build3DRoomScene(); 
+            });
+            dom.canvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+            dom.canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    dom.canvas.dispatchEvent(new MouseEvent("mousedown", { clientX: touch.clientX, clientY: touch.clientY }));
+                }
+            }, { passive: true });
+            dom.canvas.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    dom.canvas.dispatchEvent(new MouseEvent("mousemove", { clientX: touch.clientX, clientY: touch.clientY }));
+                }
+            }, { passive: true });
+            dom.canvas.addEventListener('touchend', () => { dom.canvas.dispatchEvent(new MouseEvent("mouseup", {})); });
+        }
+
+        if(dom.btnRunAi) dom.btnRunAi.addEventListener('click', async () => {
+            if (!furnitureData || furnitureData.length === 0) {
+                showToast("尚未載入家具庫，無法進行規劃！"); return;
+            }
+            const checkboxes = document.querySelectorAll('#ai-furniture-selector input[type="checkbox"]:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedIds.length === 0) {
+                showToast("請至少勾選一項家具以進行空間規劃！"); return;
+            }
+
+            const selectedFurniture = furnitureData.filter(f => selectedIds.includes(f.id));
+            dom.btnRunAi.disabled = true; 
+            dom.btnRunAi.innerHTML = `<span class="flex items-center space-x-2"><svg class="w-5 h-5 animate-spin text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>智能運算中...</span></span>`;
+            try {
+                const res = await callGeminiPlanner(
+                    parseInt(document.getElementById('room-width').value) || 500,
+                    parseInt(document.getElementById('room-depth').value) || 400,
+                    document.getElementById('layout-style').value,
+                    selectedFurniture 
+                );
+                currentLayout = res.furnitureLayout; 
+                if(dom.aiConceptText) dom.aiConceptText.innerText = res.roomAnalysis;
+                if(dom.blueprintContainer) dom.blueprintContainer.classList.remove('hidden'); 
+                drawBlueprint();
+                showToast('AI 空間佈置成功！', true);
+            } catch (err) {
+                showToast('AI 伺服器忙線中，使用智慧預設演算完成佈置');
+                currentLayout = selectedFurniture.map((f, idx) => {
+                    const fallbackPos = [
+                        { x_pct: 50, y_pct: 20, rotation: 180 },
+                        { x_pct: 50, y_pct: 75, rotation: 0 },
+                        { x_pct: 50, y_pct: 48, rotation: 0 },
+                        { x_pct: 20, y_pct: 80, rotation: 45 },
+                        { x_pct: 80, y_pct: 80, rotation: 315 },
+                        { x_pct: 20, y_pct: 20, rotation: 135 }
+                    ];
+                    return { id: f.id, ...(fallbackPos[idx] || fallbackPos[0]) };
+                });
+                if(dom.aiConceptText) dom.aiConceptText.innerText = `已為您精選 ${selectedFurniture.length} 項家具配置。因連線問題啟動離線演算，將主要家具居中對齊。`;
+                if(dom.blueprintContainer) dom.blueprintContainer.classList.remove('hidden'); 
+                drawBlueprint();
+            } finally {
+                dom.btnRunAi.disabled = false; 
+                dom.btnRunAi.innerHTML = `<span class="flex items-center space-x-2"><svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>重新生成佈置方案</span></span>`;
+                if(is3DMode) build3DRoomScene();
+            }
+        });
+
+        function setupCustomARButton() {
+            const mv = document.getElementById('model-viewer');
+            const viewerArea = document.getElementById('viewer-area');
+            if (!viewerArea || !mv) return;
+
+            mv.setAttribute('ar', '');
+            mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+
+            const oldBtn = mv.querySelector('[slot="ar-button"]');
+            if (oldBtn) oldBtn.style.display = 'none';
+            
+            const existingCustom = viewerArea.querySelector('#custom-ar-btn');
+            if (existingCustom) existingCustom.remove();
+
+            const customArBtn = document.createElement('button');
+            customArBtn.id = 'custom-ar-btn';
+            
+            customArBtn.className = "absolute bottom-6 right-6 bg-slate-900/95 backdrop-blur text-white font-bold py-3 px-5 rounded-full shadow-xl border border-slate-700/50 flex items-center space-x-2 hover:scale-105 hover:bg-black transition-transform active:scale-95 z-50";
+            customArBtn.innerHTML = `<svg class="w-5 h-5 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span>實體空間查看</span>`;
+            
+            customArBtn.addEventListener('click', () => {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    showToast("正在啟動 AR 實境...");
+                    mv.activateAR().catch(() => showToast("啟動 AR 失敗，請確認您的裝置是否支援。"));
+                } else {
+                    showToast("AR 實境功能需要使用「手機或平板」開啟此網頁喔！", true);
+                }
+            });
+            
+            viewerArea.appendChild(customArBtn);
+        }
+
+        async function bootstrap() {
+            await loadFurnitureData();
+            setupCustomARButton(); 
+        }
+        bootstrap();
+
+        if(dom.modelViewer) dom.modelViewer.addEventListener('ar-status', (e) => {
+            if (e.detail.status === 'not-presenting') {
+                const currentExposure = parseFloat(dom.modelViewer.getAttribute('exposure')) || 1.0;
+                dom.modelViewer.exposure = 0.01;
+                setTimeout(() => { dom.modelViewer.exposure = currentExposure; }, 120);
+            }
+        });
+    </script>
+</body>
+</html>
