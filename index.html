@@ -281,35 +281,6 @@
         訊息提示
     </div>
 
-	<div id="ar-overlay" class="fixed inset-0 pointer-events-none z-50 hidden select-none">
-        <div id="ar-status-text" class="absolute top-6 left-1/2 -translate-x-1/2 bg-slate-950/90 text-white text-xs px-5 py-3 rounded-full font-bold shadow-2xl pointer-events-auto text-center border border-slate-800 backdrop-blur-md max-w-[90%] transition-all">
-            請緩慢晃動手機掃描地面，出現藍圈時點擊螢幕放下整套家具
-        </div>
-        
-        <div id="ar-control-panel" class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-slate-800 backdrop-blur-lg rounded-3xl p-4 shadow-2xl flex flex-col items-center space-y-3 pointer-events-auto hidden w-[90%] max-w-xs animate-fade-in">
-            <div id="ar-selected-name" class="text-white text-xs font-bold truncate w-full text-center border-b border-slate-800 pb-2">
-                已選取家具
-            </div>
-            
-            <div class="grid grid-cols-3 gap-2 w-full">
-                <button onclick="handleArTransform('rot-ccw')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">↩️<span class="text-[9px] text-slate-400 mt-0.5">左旋</span></button>
-                <button onclick="handleArTransform('up')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">⬆️<span class="text-[9px] text-slate-400 mt-0.5">向前</span></button>
-                <button onclick="handleArTransform('rot-cw')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">🔄<span class="text-[9px] text-slate-400 mt-0.5">右旋</span></button>
-                
-                <button onclick="handleArTransform('left')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">⬅️<span class="text-[9px] text-slate-400 mt-0.5">往左</span></button>
-                <button onclick="handleArTransform('delete')" class="bg-red-950 border border-red-800/50 text-red-200 p-2 rounded-xl active:scale-95 transition flex flex-col items-center font-bold">🗑️<span class="text-[9px] text-red-300 mt-0.5">刪除</span></button>
-                <button onclick="handleArTransform('right')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">➡️<span class="text-[9px] text-slate-400 mt-0.5">往右</span></button>
-                
-                <div class="col-span-1"></div>
-                <button onclick="handleArTransform('down')" class="bg-slate-900 border border-slate-800 text-white p-2 rounded-xl active:scale-95 transition flex flex-col items-center">⬇️<span class="text-[9px] text-slate-400 mt-0.5">向後</span></button>
-                <div class="col-span-1"></div>
-            </div>
-            
-            <button onclick="deselectArModel()" class="w-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs py-2 rounded-xl active:bg-slate-800 transition">取消選取</button>
-        </div>
-    </div>
-</body>
-
     <script>
         const apiKey = ""; 
         let furnitureData = []; 
@@ -323,15 +294,6 @@
         let selected3DModel = null;
         const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); 
         const planeIntersection = new THREE.Vector3();
-
-		// === 📌 新增：AR 全景空間模式專用變數 ===
-let layoutGroup = new THREE.Group();  // 裝載整間房間家具的「大籃子」
-let reticle;                         // 手機掃描地面時的「藍色瞄準圈」
-let hitTestSource = null;
-let hitTestSourceRequested = false;
-let isGroupPlaced = false;           // 標記整套設計是否已經在現實中落腳
-let selectedArModel = null;          // 目前在 AR 中被點選的單一家具模型
-let arSelectionHelper = null;        // 選取時顯示的 3D 提示外框線
 
         const dom = {
             modelViewer: document.getElementById('model-viewer'),
@@ -556,109 +518,60 @@ let arSelectionHelper = null;        // 選取時顯示的 3D 提示外框線
         }
 
         function initThreeJS() {
-    if (scene) return; // 避免重複初始化
-    
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a); // Slate 900
-    scene.fog = new THREE.Fog(0x0f172a, 4, 12);
-
-    // 📌 [新增] 將裝載整間房間家具的 AR 籃子加入場景
-    scene.add(layoutGroup);
-
-    camera = new THREE.PerspectiveCamera(50, dom.room3dContainer.clientWidth / dom.room3dContainer.clientHeight, 0.1, 100);
-    camera.position.set(0, 3, 5); // 鳥瞰/斜對角視角
-
-    // 📌 [修改] 加入 alpha: true，允許手機鏡頭的真實畫面透視進來
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(dom.room3dContainer.clientWidth, dom.room3dContainer.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    dom.room3dContainer.appendChild(renderer.domElement);
-
-    // 📌 [新增] 開啟 WebXR 核心硬體渲染支援
-    renderer.xr.enabled = true;
-
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 - 0.05; // 限制不能看到地板下方
-    controls.minDistance = 2;
-    controls.maxDistance = 10;
-
-    // 燈光設置
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(5, 8, 5);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 25;
-    const d = 4;
-    dirLight.shadow.camera.left = -d;
-    dirLight.shadow.camera.right = d;
-    dirLight.shadow.camera.top = d;
-    dirLight.shadow.camera.bottom = -d;
-    dirLight.shadow.bias = -0.0005;
-    scene.add(dirLight);
-
-    // 輔助燈光讓暗部不要太死
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
-    fillLight.position.set(-5, 4, -5);
-    scene.add(fillLight);
-
-    // 📌 [新增] 建立實體地板瞄準圈 (當手機照到地面時出現的藍色圈圈)
-    reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.12, 0.15, 32).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: 0x3b82f6, side: THREE.DoubleSide })
-    );
-    reticle.matrixAutoUpdate = false;
-    reticle.visible = false;
-    scene.add(reticle);
-
-    // 互動支援：拖拽調整(非AR環境)
-    setup3DDragInteraction();
-
-    // 📌 [修改] 將原本的 requestAnimationFrame 改為 WebXR 專用的常駐渲染更新迴圈
-    renderer.setAnimationLoop((timestamp, frame) => {
-        if (renderer.xr.isPresenting && frame) {
-            // 🌟 狀態 A：處於手機 AR 實境模式下
-            const referenceSpace = renderer.xr.getReferenceSpace();
-            const session = renderer.xr.getSession();
+            if (scene) return; 
             
-            // 首次進入 AR 時，向硬體發出實體地面探測 (Hit-Test) 請求
-            if (!hitTestSourceRequested) {
-                session.requestReferenceSpace('viewer').then((space) => {
-                    session.requestHitTestSource({ space: space }).then((source) => { hitTestSource = source; });
-                });
-                hitTestSourceRequested = true;
-            }
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a); 
+            scene.fog = new THREE.Fog(0x0f172a, 4, 12);
 
-            // 如果整套家具還沒有放下來，就持續根據鏡頭中心探測地面，更新藍色圈圈位置
-            if (hitTestSource && !isGroupPlaced) {
-                const results = frame.getHitTestResults(hitTestSource);
-                if (results.length > 0) {
-                    reticle.visible = true;
-                    reticle.matrix.fromArray(results[0].getPose(referenceSpace).transform.matrix);
-                } else {
-                    reticle.visible = false;
-                }
-            }
-        } else {
-            // 🌟 狀態 B：一般網頁 3D 模式下，持續更新滑鼠軌道控制器
-            if (controls) controls.update();
+            camera = new THREE.PerspectiveCamera(50, dom.room3dContainer.clientWidth / dom.room3dContainer.clientHeight, 0.1, 100);
+            camera.position.set(0, 3, 5); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(dom.room3dContainer.clientWidth, dom.room3dContainer.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+
+            dom.room3dContainer.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+            controls.minDistance = 2; controls.maxDistance = 8;
+            controls.target.set(0, 0.5, 0);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffedd5, 2.5); 
+            dirLight.position.set(5, 8, 3);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.bias = -0.001;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0xbae6fd, 1.2); 
+            fillLight.position.set(-5, 3, -5);
+            scene.add(fillLight);
+
+            setup3DDragInteraction();
+
+            window.addEventListener('resize', () => {
+                if (!is3DMode) return;
+                camera.aspect = dom.room3dContainer.clientWidth / dom.room3dContainer.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(dom.room3dContainer.clientWidth, dom.room3dContainer.clientHeight);
+            });
+
+            renderer.setAnimationLoop(() => {
+                controls.update();
+                renderer.render(scene, camera);
+            });
         }
-        
-        // 讓選取時的藍色 3D 提示外框線跟著模型動畫跑
-        if (arSelectionHelper) arSelectionHelper.update();
-        
-        // 渲染場景
-        renderer.render(scene, camera);
-    });
-}
 
 		function setup3DDragInteraction() {
 			const canvasElement = renderer.domElement;
@@ -790,131 +703,181 @@ let arSelectionHelper = null;        // 選取時顯示的 3D 提示外框線
 		}
 
         async function build3DRoomScene() {
-    if (!scene) initThreeJS();
+            dom.roomLoading.classList.remove('hidden');
+            initThreeJS();
 
-    // 清理舊模型與物件
-    loadedModels.forEach(model => {
-        scene.remove(model);
-        layoutGroup.remove(model); // 📌 [新增] 確保從 AR 家具籃子裡也同步拆卸
-        
-        // 遞迴釋放記憶體避免洩漏
-        model.traverse((child) => {
-            if (child.isMesh) {
-                child.geometry.dispose();
-                if (Array.isArray(child.material)) {
-                    child.material.forEach(m => m.dispose());
-                } else {
-                    child.material.dispose();
-                }
-            }
-        });
-    });
-    loadedModels = [];
-
-    const rWidth = parseInt(document.getElementById('room-width').value) || 500;
-    const rDepth = parseInt(document.getElementById('room-depth').value) || 400;
-    
-    // 單位換算：公分轉公尺
-    const rWidthM = rWidth / 100;
-    const rDepthM = rDepth / 100;
-    const rHeightM = 2.8; // 固定牆高 2.8 公尺
-
-    // 1. 建立地板 (帶有精緻的木紋感材質)
-    const floorGeo = new THREE.PlaneGeometry(rWidthM, rDepthM);
-    const floorMat = new THREE.MeshStandardMaterial({ 
-        color: 0xd97706, // 溫暖木色 Amber 600
-        roughness: 0.4,
-        metalness: 0.1
-    });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    loadedModels.push(floor);
-
-    // 2. 建立牆壁 (後牆、左牆、右牆，維持前留空方便視切)
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9 }); // Slate 200
-    
-    // 後牆
-    const backWallGeo = new THREE.PlaneGeometry(rWidthM, rHeightM);
-    const backWall = new THREE.Mesh(backWallGeo, wallMat);
-    backWall.position.set(0, rHeightM/2, -rDepthM/2);
-    backWall.receiveShadow = true;
-    scene.add(backWall);
-    loadedModels.push(backWall);
-
-    // 左牆
-    const leftWallGeo = new THREE.PlaneGeometry(rDepthM, rHeightM);
-    const leftWall = new THREE.Mesh(leftWallGeo, wallMat);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(-rWidthM/2, rHeightM/2, 0);
-    leftWall.receiveShadow = true;
-    scene.add(leftWall);
-    loadedModels.push(leftWall);
-
-    // 右牆
-    const rightWallGeo = new THREE.PlaneGeometry(rDepthM, rHeightM);
-    const rightWall = new THREE.Mesh(rightWallGeo, wallMat);
-    rightWall.rotation.y = -Math.PI / 2;
-    rightWall.position.set(rWidthM/2, rHeightM/2, 0);
-    rightWall.receiveShadow = true;
-    scene.add(rightWall);
-    loadedModels.push(rightWall);
-
-    // 3. 異步加載當前佈置方案中的所有家具模型
-    const loader = new THREE.GLTFLoader();
-    const loadPromises = currentLayout.map((layoutItem, index) => {
-        return new Promise((resolve) => {
-            const itemData = furnitureData.find(f => f.id === layoutItem.id);
-            if (!itemData || !itemData.glbUrl) return resolve(); // 找不到模型直接跳過
-
-            loader.load(itemData.glbUrl, (gltf) => {
-                const model = gltf.scene;
-                model.name = `3d_item_${layoutItem.id}_${index}`;
-                
-                // 📌 [新增] 讓 3D 模型實體綁定自己在核心數據陣列中的座標、角度參考 (userData)
-                // 這能讓使用者在 AR 現場戳它並點擊微調面板時，程式能將新位置即時更新回 2D 藍圖
-                model.userData = { id: layoutItem.id, itemRef: layoutItem };
-
-                // 計算在 3D 世界中的實際公尺位置 (以中心點為 0,0)
-                const xPos = ((layoutItem.x_pct / 100) - 0.5) * rWidthM;
-                const zPos = ((layoutItem.y_pct / 100) - 0.5) * rDepthM;
-                model.position.set(xPos, 0, zPos);
-                
-                // 旋轉 (角度轉弧度，注意反向匹配)
-                model.rotation.y = - (layoutItem.rotation * Math.PI) / 180; 
-
-                // 縮放微調
-                const scale = itemData.scaleAdjustment || 1;
-                model.scale.set(scale, scale, scale);
-
-                // 核心：精準碰撞貼地校正 (防止模型軸心不一導致懸空或陷地)
-                const box = new THREE.Box3().setFromObject(model);
-                const bottomY = box.min.y;
-                model.position.y = model.position.y - bottomY;
-
-                // 啟用陰影傳遞
-                model.traverse((child) => {
+            loadedModels.forEach(model => {
+                scene.remove(model);
+                model.traverse(child => {
                     if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
+                        child.geometry.dispose();
+                        if(child.material.dispose) child.material.dispose();
                     }
                 });
-
-                // 📌 [修改] 將家具模型統一加進可以集體定錨、投放的 layoutGroup 大籃子中，而不是直接散在 scene
-                layoutGroup.add(model);
-                loadedModels.push(model);
-                resolve();
-            }, undefined, (err) => {
-                console.error("模型載入失敗:", err);
-                resolve(); // 失敗也 resolve 避免卡死整個場景渲染
             });
-        });
-    });
+            loadedModels = [];
 
-    // 等待所有家具載入完畢
-    await Promise.all(loadPromises);
-}
+            const rWidthCm = parseInt(document.getElementById('room-width').value) || 500;
+            const rDepthCm = parseInt(document.getElementById('room-depth').value) || 400;
+            const rWidthM = rWidthCm / 100;
+            const rDepthM = rDepthCm / 100;
+            const rHeightM = 2.4; 
+
+            dragPlane.constant = 0; 
+
+            const floorGeo = new THREE.PlaneGeometry(rWidthM, rDepthM);
+            const floorTex = createWoodFloorTexture(rWidthM, rDepthM);
+            const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.35, metalness: 0.1 });
+            const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.9, metalness: 0.0 });
+            const backWall = new THREE.Mesh(new THREE.PlaneGeometry(rWidthM, rHeightM), wallMat);
+            backWall.position.set(0, rHeightM / 2, -rDepthM / 2); backWall.receiveShadow = true; scene.add(backWall);
+
+            const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(rDepthM, rHeightM), wallMat);
+            leftWall.position.set(-rWidthM / 2, rHeightM / 2, 0); leftWall.rotation.y = Math.PI / 2; leftWall.receiveShadow = true; scene.add(leftWall);
+
+            const winWidthM = rDepthM * 0.55;                
+            const sideWallWidthM = (rDepthM - winWidthM) / 2; 
+            const balconyDepth = 2.2;                        
+
+            const rightWallFront = new THREE.Mesh(new THREE.PlaneGeometry(sideWallWidthM, rHeightM), wallMat);
+            rightWallFront.position.set(rWidthM / 2, rHeightM / 2, rDepthM / 2 - sideWallWidthM / 2);
+            rightWallFront.rotation.y = -Math.PI / 2; 
+            rightWallFront.receiveShadow = true;
+            scene.add(rightWallFront);
+
+            const rightWallBack = new THREE.Mesh(new THREE.PlaneGeometry(sideWallWidthM, rHeightM), wallMat);
+            rightWallBack.position.set(rWidthM / 2, rHeightM / 2, -rDepthM / 2 + sideWallWidthM / 2);
+            rightWallBack.rotation.y = -Math.PI / 2;
+            rightWallBack.receiveShadow = true;
+            scene.add(rightWallBack);
+
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff,
+                transmission: 0.85, 
+                opacity: 1,
+                transparent: true,
+                roughness: 0.05,
+                ior: 1.5,           
+                side: THREE.DoubleSide
+            });
+            const slidingWindow = new THREE.Mesh(new THREE.PlaneGeometry(winWidthM, rHeightM), glassMat);
+            slidingWindow.position.set(rWidthM / 2, rHeightM / 2, 0);
+            slidingWindow.rotation.y = -Math.PI / 2;
+            scene.add(slidingWindow);
+
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.8 });
+            
+            const topFrame = new THREE.Mesh(new THREE.BoxGeometry(winWidthM, 0.1, 0.15), frameMat);
+            topFrame.position.set(rWidthM / 2, rHeightM, 0);
+            topFrame.rotation.y = -Math.PI / 2;
+            scene.add(topFrame);
+            
+            const bottomFrame = new THREE.Mesh(new THREE.BoxGeometry(winWidthM, 0.05, 0.15), frameMat);
+            bottomFrame.position.set(rWidthM / 2, 0.025, 0);
+            bottomFrame.rotation.y = -Math.PI / 2;
+            scene.add(bottomFrame);
+            
+            const frontFrame = new THREE.Mesh(new THREE.BoxGeometry(0.1, rHeightM, 0.15), frameMat);
+            frontFrame.position.set(rWidthM / 2, rHeightM / 2, winWidthM / 2);
+            frontFrame.rotation.y = -Math.PI / 2;
+            scene.add(frontFrame);
+            
+            const backFrame = new THREE.Mesh(new THREE.BoxGeometry(0.1, rHeightM, 0.15), frameMat);
+            backFrame.position.set(rWidthM / 2, rHeightM / 2, -winWidthM / 2);
+            backFrame.rotation.y = -Math.PI / 2;
+            scene.add(backFrame);
+            
+            const centerFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, rHeightM, 0.18), frameMat);
+            centerFrame.position.set(rWidthM / 2, rHeightM / 2, 0);
+            centerFrame.rotation.y = -Math.PI / 2;
+            scene.add(centerFrame);
+
+            const balconyFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(balconyDepth, winWidthM), 
+                new THREE.MeshStandardMaterial({ color: 0x8ea3b8, roughness: 0.85 }) 
+            );
+            balconyFloor.rotation.x = -Math.PI / 2;
+            balconyFloor.position.set(rWidthM / 2 + balconyDepth / 2, -0.01, 0);
+            balconyFloor.receiveShadow = true;
+            scene.add(balconyFloor);
+
+            const railingHeight = 1.1;
+            const handrailMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.6 });
+
+            const frontRailing = new THREE.Mesh(new THREE.BoxGeometry(0.05, railingHeight, winWidthM), glassMat);
+            frontRailing.position.set(rWidthM / 2 + balconyDepth, railingHeight / 2, 0);
+            scene.add(frontRailing);
+
+            const frontHandrail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, winWidthM), handrailMat);
+            frontHandrail.position.set(rWidthM / 2 + balconyDepth, railingHeight, 0);
+            scene.add(frontHandrail);
+
+            const sideRailingBack = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, railingHeight, 0.05), glassMat);
+            sideRailingBack.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight / 2, -winWidthM / 2);
+            scene.add(sideRailingBack);
+
+            const sideHandrailBack = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, 0.05, 0.12), handrailMat);
+            sideHandrailBack.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight, -winWidthM / 2);
+            scene.add(sideHandrailBack);
+
+            const sideRailingFront = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, railingHeight, 0.05), glassMat);
+            sideRailingFront.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight / 2, winWidthM / 2);
+            scene.add(sideRailingFront);
+
+            const sideHandrailFront = new THREE.Mesh(new THREE.BoxGeometry(balconyDepth, 0.05, 0.12), handrailMat);
+            sideHandrailFront.position.set(rWidthM / 2 + balconyDepth / 2, railingHeight, winWidthM / 2);
+            scene.add(sideHandrailFront);
+
+            const loader = new THREE.GLTFLoader();
+            const loadPromises = currentLayout.map((layoutItem, index) => {
+                return new Promise((resolve) => {
+                    const itemData = furnitureData.find(f => f.id === layoutItem.id);
+                    if (!itemData) return resolve();
+
+                    loader.load(itemData.glbUrl, (gltf) => {
+                        const model = gltf.scene;
+                        
+                        model.name = `3d_item_${layoutItem.id}_${index}`;
+
+                        const xPos = ((layoutItem.x_pct / 100) - 0.5) * rWidthM;
+                        const zPos = ((layoutItem.y_pct / 100) - 0.5) * rDepthM;
+                        model.position.set(xPos, 0, zPos);
+
+                        const finalRotationDegrees = layoutItem.rotation + (itemData.rotationOffset || 0);
+                        model.rotation.y = - (finalRotationDegrees * Math.PI) / 180; 
+
+                        const scale = itemData.scaleAdjustment || 1;
+                        model.scale.set(scale, scale, scale);
+
+                        const box = new THREE.Box3().setFromObject(model);
+                        const lowestY = box.min.y;
+                        model.position.y = model.position.y - lowestY;
+
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+
+                        scene.add(model);
+                        loadedModels.push(model); 
+                        resolve();
+                    }, undefined, (error) => {
+                        console.error(`模型載入失敗: ${itemData.id}`, error);
+                        resolve(); 
+                    });
+                });
+            });
+
+            await Promise.all(loadPromises);
+            dom.roomLoading.classList.add('hidden');
+        }
 
         function switchTo3DMode(manualRequest = false) {
             is3DMode = true;
@@ -1397,108 +1360,37 @@ Use percentage coordinates (x_pct, y_pct from 10 to 90). Provide reason in 'room
         });
 
         function setupCustomARButton() {
-    const mv = document.getElementById('model-viewer');
-    // 自動尋找目前合適的按鈕注入區域
-    const viewerArea = document.getElementById('viewer-area') || (mv ? mv.parentElement : null);
-    if (!viewerArea) return;
+            const mv = document.getElementById('model-viewer');
+            const viewerArea = document.getElementById('viewer-area');
+            if (!viewerArea || !mv) return;
 
-    const existingCustom = viewerArea.querySelector('#custom-ar-btn');
-    if (existingCustom) existingCustom.remove();
+            mv.setAttribute('ar', '');
+            mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
 
-    const customArBtn = document.createElement('button');
-    customArBtn.id = 'custom-ar-btn';
-    customArBtn.className = "absolute bottom-6 right-6 bg-slate-900/95 backdrop-blur text-white font-bold py-3 px-5 rounded-full shadow-xl border border-slate-700/50 flex items-center space-x-2 hover:scale-105 hover:bg-black transition-transform active:scale-95 z-50";
-    customArBtn.innerHTML = `<svg class="w-5 h-5 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span>實體空間查看</span>`;
-    
-    customArBtn.addEventListener('click', () => {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (!isMobile) {
-            showToast("💡 AR 實境功能需要使用「手機或平板」開啟此網頁喔！", true);
-            return;
-        }
-
-        // 🌟 自動判斷：目前是否在 3D 全景房間分頁 (檢查 3D 容器是否可見)
-        const isRoom3DActive = !dom.room3dContainer.classList.contains('hidden');
-
-        if (isRoom3DActive) {
-            // 【模式 A：整間設計全景部署 AR】
-            if (currentLayout.length === 0) { return showToast("請先點擊按鈕生成 AI 佈置方案！"); }
+            const oldBtn = mv.querySelector('[slot="ar-button"]');
+            if (oldBtn) oldBtn.style.display = 'none';
             
-            isGroupPlaced = false;
-            deselectArModel();
-            
-            // 隱藏虛擬的 3D 牆壁與地板，準備與現實合一
-            loadedModels.forEach(m => { if(m !== layoutGroup && !layoutGroup.children.includes(m)) m.visible = false; });
-            if (scene) scene.background = null;
+            const existingCustom = viewerArea.querySelector('#custom-ar-btn');
+            if (existingCustom) existingCustom.remove();
 
-            // 向手機瀏覽器申請 AR 全限，並將剛才寫好的 #ar-overlay 面板疊加在最上層
-            const sessionInit = { 
-                requiredFeatures: ['hit-test'],
-                optionalFeatures: ['dom-overlay'],
-                domOverlay: { root: document.getElementById('ar-overlay') }
-            };
+            const customArBtn = document.createElement('button');
+            customArBtn.id = 'custom-ar-btn';
             
-            navigator.xr.requestSession('immersive-ar', sessionInit).then((session) => {
-                renderer.xr.setSession(session);
-                document.getElementById('ar-overlay').classList.remove('hidden');
-                document.getElementById('ar-status-text').innerText = "請緩慢晃動手機掃描地面，出現藍圈時點擊螢幕放下整套家具";
-                
-                // 監聽手機螢幕的觸控點擊
-                const controller = renderer.xr.getController(0);
-                const onSelect = () => {
-                    if (!isGroupPlaced) {
-                        // 階段 1：尚未定位時，點擊會把「整組空間家具」一次降落到藍圈位置
-                        if (reticle.visible) {
-                            layoutGroup.position.setFromMatrixPosition(reticle.matrix);
-                            isGroupPlaced = true;
-                            reticle.visible = false;
-                            document.getElementById('ar-status-text').innerText = "✨ 成功投射！點擊實景中的虛擬家具可開啟控制盤進行微調。";
-                        }
-                    } else {
-                        // 階段 2：已經定位後，點擊會從手機鏡頭中心發射 3D 射線，偵測使用者點選了哪件家具
-                        const tempMatrix = new THREE.Matrix4();
-                        tempMatrix.identity().extractRotation(controller.matrix);
-                        
-                        const raycaster = new THREE.Raycaster();
-                        raycaster.ray.origin.setFromMatrixPosition(controller.matrix);
-                        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-                        
-                        const intersects = raycaster.intersectObjects(layoutGroup.children, true);
-                        if (intersects.length > 0) {
-                            let hitModel = intersects[0].object;
-                            while (hitModel.parent && hitModel.parent !== layoutGroup) { hitModel = hitModel.parent; }
-                            selectArModel(hitModel);
-                        } else {
-                            deselectArModel(); // 點擊到空地則關閉控制盤
-                        }
-                    }
-                };
-                controller.addEventListener('select', onSelect);
-                scene.add(controller);
-
-                // 當使用者離開 AR 模式時的回呼
-                session.addEventListener('end', () => {
-                    document.getElementById('ar-overlay').classList.add('hidden');
-                    hitTestSource = null;
-                    hitTestSourceRequested = false;
-                    // 還原網頁上的 3D 虛擬灰色場景
-                    loadedModels.forEach(m => m.visible = true);
-                    if (scene) scene.background = new THREE.Color(0x0f172a);
-                });
-            }).catch(err => {
-                console.error(err);
-                showToast("啟動全景 AR 失敗，請確認您的瀏覽器是否支援 WebXR。");
+            customArBtn.className = "absolute bottom-6 right-6 bg-slate-900/95 backdrop-blur text-white font-bold py-3 px-5 rounded-full shadow-xl border border-slate-700/50 flex items-center space-x-2 hover:scale-105 hover:bg-black transition-transform active:scale-95 z-50";
+            customArBtn.innerHTML = `<svg class="w-5 h-5 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span>實體空間查看</span>`;
+            
+            customArBtn.addEventListener('click', () => {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    showToast("正在啟動 AR 實境...");
+                    mv.activateAR().catch(() => showToast("啟動 AR 失敗，請確認您的裝置是否支援。"));
+                } else {
+                    showToast("AR 實境功能需要使用「手機或平板」開啟此網頁喔！", true);
+                }
             });
-
-        } else {
-            // 【模式 B：原本的單品檢視 AR】
-            showToast("正在啟動單品 AR 實境...");
-            mv.activateAR().catch(() => showToast("啟動 AR 失敗，請確認您的裝置是否支援。"));
+            
+            viewerArea.appendChild(customArBtn);
         }
-    });
-    
-    viewerArea.appendChild(customArBtn);
-}
 
         async function bootstrap() {
             await loadFurnitureData();
@@ -1513,88 +1405,6 @@ Use percentage coordinates (x_pct, y_pct from 10 to 90). Provide reason in 'room
                 setTimeout(() => { dom.modelViewer.exposure = currentExposure; }, 120);
             }
         });
-
-		// ================= 📌 新增：AR 全景微調控制盤核心控制函式 =================
-
-// 1. 選取家具物件
-function selectArModel(model) {
-    selectedArModel = model;
-    const itemData = furnitureData.find(f => f.id === model.userData.id);
-    document.getElementById('ar-selected-name').innerText = `已選取：${itemData ? itemData.name : '虛擬家具'}`;
-    document.getElementById('ar-control-panel').classList.remove('hidden');
-    
-    // 在手機畫面上為該家具套上一個藍色的 3D 提示外框
-    if (arSelectionHelper) scene.remove(arSelectionHelper);
-    arSelectionHelper = new THREE.BoxHelper(model, 0x3b82f6);
-    scene.add(arSelectionHelper);
-}
-
-// 2. 取消選取家具
-function deselectArModel() {
-    selectedArModel = null;
-    document.getElementById('ar-control-panel').classList.add('hidden');
-    if (arSelectionHelper) {
-        scene.remove(arSelectionHelper);
-        arSelectionHelper = null;
-    }
-}
-
-// 3. 處理按鈕控制盤平移、旋轉、刪除動作
-function handleArTransform(action) {
-    if (!selectedArModel) return;
-    
-    const stepM = 0.05; // 每次挪動 5 公分，極高精度
-    const rotRad = (15 * Math.PI) / 180; // 每次旋轉 15 度
-    
-    switch (action) {
-        case 'left':    selectedArModel.position.x -= stepM; break;
-        case 'right':   selectedArModel.position.x += stepM; break;
-        case 'up':      selectedArModel.position.z -= stepM; break; // Three.js 中 Z 軸代表前後深度
-        case 'down':    selectedArModel.position.z += stepM; break;
-        case 'rot-cw':  selectedArModel.rotation.y -= rotRad; break; // 順時針轉
-        case 'rot-ccw': selectedArModel.rotation.y += rotRad; break; // 逆時針轉
-        case 'delete':
-            if (confirm("確定要將此家具從房間配置中移除嗎？")) {
-                const itemRef = selectedArModel.userData.itemRef;
-                // 從核心 currentLayout 資料結構中剔除
-                const index = currentLayout.indexOf(itemRef);
-                if (index !== -1) currentLayout.splice(index, 1);
-                // 從 3D 世界中拔除
-                layoutGroup.remove(selectedArModel);
-                deselectArModel();
-                drawBlueprint(); // 即時重繪網頁 2D 藍圖
-            }
-            return;
-    }
-    
-    // 📌 將 3D 微調後的新位置，精準逆向寫回 2D 數據中，達成雙向同步！
-    syncArModelToData(selectedArModel);
-}
-
-// 4. 核心數學計算：將 3D 世界座標（公尺）轉換為 2D 藍圖的（百分比座標與角度）
-function syncArModelToData(model) {
-    const itemRef = model.userData.itemRef;
-    if (!itemRef) return;
-    
-    const rWidthM = (parseInt(document.getElementById('room-width').value) || 500) / 100;
-    const rDepthM = (parseInt(document.getElementById('room-depth').value) || 400) / 100;
-    
-    // 逆向反推坐標百分比公式
-    let x_pct = Math.round(((model.position.x / rWidthM) + 0.5) * 100);
-    let y_pct = Math.round(((model.position.z / rDepthM) + 0.5) * 100);
-    
-    // 限制邊界在 10 ~ 90 之間，防止微調過頭穿牆
-    itemRef.x_pct = Math.max(10, Math.min(90, x_pct));
-    itemRef.y_pct = Math.max(10, Math.min(90, y_pct));
-    
-    // 將 Three.js 弧度轉回 2D 藍圖的 0~360 度角度
-    let rotDeg = Math.round((-model.rotation.y * 180) / Math.PI) % 360;
-    if (rotDeg < 0) rotDeg += 360;
-    itemRef.rotation = rotDeg;
-    
-    // 呼叫您原本的 2D 藍圖畫布重繪功能，後台資料同步更新！
-    drawBlueprint();
-}
     </script>
 </body>
 </html>
